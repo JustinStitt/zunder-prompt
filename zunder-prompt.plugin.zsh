@@ -65,6 +65,102 @@ function gitstatus_prompt_update() {
   GITSTATUS_PROMPT_LEN="${(m)#${${${GITSTATUS_PROMPT//\%\%/x}//\%(f|<->F)}//\%[Bb]}}"
 }
 
+# Right-aligned prompt modules for the top line (with filepath).
+if ! (( ${+ZUNDER_PROMPT_TOP_RIGHT_MODULES} )); then
+  typeset -ga ZUNDER_PROMPT_TOP_RIGHT_MODULES
+  ZUNDER_PROMPT_TOP_RIGHT_MODULES=()
+fi
+
+# Indices of top modules to cache (calculate once).
+if ! (( ${+ZUNDER_PROMPT_TOP_RIGHT_MODULE_CACHE} )); then
+  typeset -ga ZUNDER_PROMPT_TOP_RIGHT_MODULE_CACHE
+  ZUNDER_PROMPT_TOP_RIGHT_MODULE_CACHE=()
+fi
+
+# Right-aligned prompt modules for the bottom line (the actual prompt).
+if ! (( ${+ZUNDER_PROMPT_BOTTOM_RIGHT_MODULES} )); then
+  typeset -ga ZUNDER_PROMPT_BOTTOM_RIGHT_MODULES
+  ZUNDER_PROMPT_BOTTOM_RIGHT_MODULES=()
+fi
+
+# Indices of bottom modules to cache (calculate once).
+if ! (( ${+ZUNDER_PROMPT_BOTTOM_RIGHT_MODULE_CACHE} )); then
+  typeset -ga ZUNDER_PROMPT_BOTTOM_RIGHT_MODULE_CACHE
+  ZUNDER_PROMPT_BOTTOM_RIGHT_MODULE_CACHE=()
+fi
+
+# Internal cache storage
+typeset -gA _ZUNDER_CACHE_TOP
+typeset -gA _ZUNDER_CACHE_BOTTOM
+
+function zunder_right_prompt_update() {
+  emulate -L zsh
+  local module output i
+
+  # Top right modules
+  local -a top_segments
+  i=0
+  for module in "${ZUNDER_PROMPT_TOP_RIGHT_MODULES[@]}"; do
+    (( i++ )); [[ $i -gt 7 ]] && break
+
+    if (( ${ZUNDER_PROMPT_TOP_RIGHT_MODULE_CACHE[(I)$((i-1))]} )); then
+      if [[ -z "${_ZUNDER_CACHE_TOP[$i]}" ]]; then
+        _ZUNDER_CACHE_TOP[$i]=$(eval "$module" 2>/dev/null)
+      fi
+      output="${_ZUNDER_CACHE_TOP[$i]}"
+    else
+      output=$(eval "$module" 2>/dev/null)
+    fi
+
+    [[ -n "$output" ]] && top_segments+=("${output}")
+  done
+  typeset -g ZUNDER_TOP_RIGHT_PROMPT="${(j: :)top_segments}"
+  typeset -gi ZUNDER_TOP_RIGHT_PROMPT_LEN="${(m)#${${${ZUNDER_TOP_RIGHT_PROMPT//\%\%/x}//\%(f|<->F)}//\%[Bb]}}"
+
+  # Bottom right modules (RPROMPT)
+  local -a bottom_segments
+  i=0
+  for module in "${ZUNDER_PROMPT_BOTTOM_RIGHT_MODULES[@]}"; do
+    (( i++ )); [[ $i -gt 7 ]] && break
+
+    if (( ${ZUNDER_PROMPT_BOTTOM_RIGHT_MODULE_CACHE[(I)$((i-1))]} )); then
+      if [[ -z "${_ZUNDER_CACHE_BOTTOM[$i]}" ]]; then
+        _ZUNDER_CACHE_BOTTOM[$i]=$(eval "$module" 2>/dev/null)
+      fi
+      output="${_ZUNDER_CACHE_BOTTOM[$i]}"
+    else
+      output=$(eval "$module" 2>/dev/null)
+    fi
+
+    [[ -n "$output" ]] && bottom_segments+=("${output}")
+  done
+  typeset -g RPROMPT="${(j: :)bottom_segments}"
+
+  # Calculate padding for the top line to right-align ZUNDER_TOP_RIGHT_PROMPT.
+  local git_len=0
+  [[ -n "$GITSTATUS_PROMPT" ]] && git_len=$(( GITSTATUS_PROMPT_LEN + 1 ))
+
+  local right_len=0
+  [[ -n "$ZUNDER_TOP_RIGHT_PROMPT" ]] && right_len=$ZUNDER_TOP_RIGHT_PROMPT_LEN
+
+  # The path is truncated if it doesn't fit.
+  # We leave at least 1 space between git and right modules if both exist.
+  local total_right_len=$(( git_len + (right_len > 0 ? right_len + 1 : 0) ))
+  typeset -g ZUNDER_TOP_LINE_RIGHT_LEN=$total_right_len
+
+  local path_max_len=$(( COLUMNS - total_right_len ))
+  (( path_max_len < 10 )) && path_max_len=10
+
+  local expanded_path="${(%):-%${path_max_len}<…<%~%<<}"
+  local path_len="${(m)#expanded_path}"
+
+  typeset -gi ZUNDER_TOP_LINE_PAD_LEN=0
+  if (( right_len > 0 )); then
+    ZUNDER_TOP_LINE_PAD_LEN=$(( COLUMNS - path_len - git_len - right_len - 1 ))
+    (( ZUNDER_TOP_LINE_PAD_LEN < 1 )) && ZUNDER_TOP_LINE_PAD_LEN=1
+  fi
+}
+
 # Start gitstatusd instance with name "MY". The same name is passed to
 # gitstatus_query in gitstatus_prompt_update. The flags with -1 as values
 # enable staged, unstaged, conflicted and untracked counters.
@@ -82,6 +178,9 @@ autoload -Uz add-zsh-hook
 
 # On every prompt, fetch git status and set GITSTATUS_PROMPT.
 add-zsh-hook precmd gitstatus_prompt_update
+
+# Updates the right prompt.
+add-zsh-hook precmd zunder_right_prompt_update
 
 # Adds a new line if it's not the first prompt.
 add-zsh-hook precmd check_first_prompt
@@ -103,10 +202,13 @@ PROMPT2="%8F·%f "
 
 # Cyan current working directory. Gets truncated from the left if the whole
 # prompt doesn't fit on the line
-PROMPT='%B%6F%$((-GITSTATUS_PROMPT_LEN-1))<…<%~%<<%f%b'
+PROMPT='%B%6F%$((COLUMNS - ZUNDER_TOP_LINE_RIGHT_LEN))<…<%~%<<%f%b'
 
 # Git status
 PROMPT+='${GITSTATUS_PROMPT:+ $GITSTATUS_PROMPT}'
+
+# Top right modules (with padding to align to the right edge)
+PROMPT+='${ZUNDER_TOP_RIGHT_PROMPT:+${(r:ZUNDER_TOP_LINE_PAD_LEN:: :)}$ZUNDER_TOP_RIGHT_PROMPT}'
 
 # New line
 PROMPT+=$'\n'

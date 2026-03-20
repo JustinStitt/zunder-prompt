@@ -63,12 +63,37 @@ zplug "warbacon/zunder-prompt", on:"romkatv/gitstatus", depth=1
 
 As zunder-prompt is built with simplicity and speed in mind, there isn't too
 much customization available. However, you can change the prompt's character
-symbol and color.
+symbol and color, and add custom right-aligned segments.
 
 ```sh
 ZUNDER_PROMPT_CHAR="➜"              # default value: "❯"
 
 ZUNDER_PROMPT_CHAR_COLOR="green"    # default value: "fg"
+```
+
+### Custom Right-Aligned Modules
+
+You can add up to 7 custom modules to the right side of both prompt lines.
+
+- `ZUNDER_PROMPT_TOP_RIGHT_MODULES`: Aligns on the same line as the filepath and git status.
+- `ZUNDER_PROMPT_BOTTOM_RIGHT_MODULES`: Aligns on the same line as the prompt character (standard `RPROMPT`).
+
+#### Caching
+
+If a module's output is static or expensive to calculate, you can cache it to be evaluated only once per shell session using 0-based indexing:
+
+- `ZUNDER_PROMPT_TOP_RIGHT_MODULE_CACHE=(idx ...)`
+- `ZUNDER_PROMPT_BOTTOM_RIGHT_MODULE_CACHE=(idx ...)`
+
+#### Example Configuration
+
+```zsh
+# Top line: Date (dynamic), Python version (cached)
+ZUNDER_PROMPT_TOP_RIGHT_MODULES=('date +%H:%M:%S' 'python --version')
+ZUNDER_PROMPT_TOP_RIGHT_MODULE_CACHE=(1)
+
+# Bottom line: VirtualEnv name (dynamic)
+ZUNDER_PROMPT_BOTTOM_RIGHT_MODULES=('echo $VIRTUAL_ENV')
 ```
 
 ## Thanks to
