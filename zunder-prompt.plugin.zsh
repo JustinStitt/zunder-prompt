@@ -13,8 +13,12 @@ function gitstatus_prompt_update() {
   typeset -g  GITSTATUS_PROMPT=''
   typeset -gi GITSTATUS_PROMPT_LEN=0
 
-  # Call gitstatus_query synchronously.
+  # Call gitstatus_query synchronously and track timing.
+  local start=$EPOCHREALTIME
   gitstatus_query 'MY'                  || return 1  # error
+  local end=$EPOCHREALTIME
+  typeset -g _ZUNDER_TIMINGS_GIT=$(( (end - start) * 1000 ))
+
   [[ $VCS_STATUS_RESULT == 'ok-sync' ]] || return 0  # not a git repo
 
   local      clean='%5F'  # magenta foreground
@@ -97,6 +101,7 @@ typeset -gA _ZUNDER_CACHE_TOP
 typeset -gA _ZUNDER_CACHE_BOTTOM
 typeset -gA _ZUNDER_TIMINGS_TOP
 typeset -gA _ZUNDER_TIMINGS_BOTTOM
+typeset -g  _ZUNDER_TIMINGS_GIT=0
 
 function zunder_right_prompt_update() {
   emulate -L zsh
@@ -181,6 +186,9 @@ function prompt-timings() {
   local i
   print "zunder-prompt module timings (ms):"
   
+  printf "\nCore Components:\n"
+  printf "  %-33s %10.2f ms\n" "gitstatus_query" "${_ZUNDER_TIMINGS_GIT:-0}"
+
   if (( ${#ZUNDER_PROMPT_TOP_RIGHT_MODULES} > 0 )); then
     print "\nTop Right Modules:"
     for i in {1..${#ZUNDER_PROMPT_TOP_RIGHT_MODULES}}; do
