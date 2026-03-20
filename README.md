@@ -78,12 +78,17 @@ You can add up to 7 custom modules to the right side of both prompt lines.
 - `ZUNDER_PROMPT_TOP_RIGHT_MODULES`: Aligns on the same line as the filepath and git status.
 - `ZUNDER_PROMPT_BOTTOM_RIGHT_MODULES`: Aligns on the same line as the prompt character (standard `RPROMPT`).
 
-#### Caching
+#### Caching & Asynchronicity
 
-If a module's output is static or expensive to calculate, you can cache it to be evaluated only once per shell session using 0-based indexing:
+If a module's output is static or expensive to calculate, you can optimize it using 0-based indexing:
 
+**Caching** (calculate once per session):
 - `ZUNDER_PROMPT_TOP_RIGHT_MODULE_CACHE=(idx ...)`
 - `ZUNDER_PROMPT_BOTTOM_RIGHT_MODULE_CACHE=(idx ...)`
+
+**Asynchronicity** (calculate in background to prevent prompt lag):
+- `ZUNDER_PROMPT_TOP_RIGHT_MODULE_ASYNC=(idx ...)`
+- `ZUNDER_PROMPT_BOTTOM_RIGHT_MODULE_ASYNC=(idx ...)`
 
 #### Example Configuration
 
@@ -92,8 +97,9 @@ If a module's output is static or expensive to calculate, you can cache it to be
 ZUNDER_PROMPT_TOP_RIGHT_MODULES=('date +%H:%M:%S' 'python --version')
 ZUNDER_PROMPT_TOP_RIGHT_MODULE_CACHE=(1)
 
-# Bottom line: VirtualEnv name (dynamic)
-ZUNDER_PROMPT_BOTTOM_RIGHT_MODULES=('echo $VIRTUAL_ENV')
+# Bottom line: Expensive script (async)
+ZUNDER_PROMPT_BOTTOM_RIGHT_MODULES=('~/scripts/my-slow-script.sh')
+ZUNDER_PROMPT_BOTTOM_RIGHT_MODULE_ASYNC=(0)
 ```
 
 #### Performance Tracking
