@@ -155,7 +155,12 @@ function zunder_gitstatus_async_start() {
     local start=$EPOCHREALTIME
     if gitstatus_query 'MY'; then
       local end=$EPOCHREALTIME
-      echo "$(_zunder_gitstatus_format)|$(( (end - start) * 1000 ))"
+      local fmt=$(_zunder_gitstatus_format)
+      if [[ -n "$fmt" ]]; then
+        echo "${fmt}|$(( (end - start) * 1000 ))"
+      else
+        echo "0||$(( (end - start) * 1000 ))"
+      fi
     fi
   ); then
     _ZUNDER_GIT_FD=$fd
