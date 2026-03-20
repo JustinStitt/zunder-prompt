@@ -96,6 +96,21 @@ ZUNDER_PROMPT_TOP_RIGHT_MODULE_CACHE=(1)
 ZUNDER_PROMPT_BOTTOM_RIGHT_MODULES=('echo $VIRTUAL_ENV')
 ```
 
+#### Performance Tracking
+
+You can use the `prompt-timings` command to see a breakdown of how long each module takes to execute in milliseconds. This is useful for identifying slow commands that should be cached.
+
+```text
+zunder-prompt module timings (ms):
+
+Top Right Modules:
+  [0] date +%H:%M:%S                     1.23 ms
+  [1] python --version                  45.67 ms (cached)
+
+Bottom Right Modules:
+  [0] echo $VIRTUAL_ENV                  0.45 ms
+```
+
 ## Thanks to
 
 - [romkatv](https://github.com/romkatv) for gitsatus.

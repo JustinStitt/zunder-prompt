@@ -5,6 +5,9 @@ if ! typeset -f gitstatus_query > /dev/null; then
   return 0
 fi
 
+# Load datetime for precise timing
+zmodload zsh/datetime
+
 function gitstatus_prompt_update() {
   emulate -L zsh
   typeset -g  GITSTATUS_PROMPT=''
@@ -89,13 +92,15 @@ if ! (( ${+ZUNDER_PROMPT_BOTTOM_RIGHT_MODULE_CACHE} )); then
   ZUNDER_PROMPT_BOTTOM_RIGHT_MODULE_CACHE=()
 fi
 
-# Internal cache storage
+# Internal storage for cache and timings
 typeset -gA _ZUNDER_CACHE_TOP
 typeset -gA _ZUNDER_CACHE_BOTTOM
+typeset -gA _ZUNDER_TIMINGS_TOP
+typeset -gA _ZUNDER_TIMINGS_BOTTOM
 
 function zunder_right_prompt_update() {
   emulate -L zsh
-  local module output i
+  local module output i start end
 
   # Top right modules
   local -a top_segments
@@ -105,11 +110,17 @@ function zunder_right_prompt_update() {
 
     if (( ${ZUNDER_PROMPT_TOP_RIGHT_MODULE_CACHE[(I)$((i-1))]} )); then
       if [[ -z "${_ZUNDER_CACHE_TOP[$i]}" ]]; then
+        start=$EPOCHREALTIME
         _ZUNDER_CACHE_TOP[$i]=$(eval "$module" 2>/dev/null)
+        end=$EPOCHREALTIME
+        _ZUNDER_TIMINGS_TOP[$i]=$(( (end - start) * 1000 ))
       fi
       output="${_ZUNDER_CACHE_TOP[$i]}"
     else
+      start=$EPOCHREALTIME
       output=$(eval "$module" 2>/dev/null)
+      end=$EPOCHREALTIME
+      _ZUNDER_TIMINGS_TOP[$i]=$(( (end - start) * 1000 ))
     fi
 
     [[ -n "$output" ]] && top_segments+=("${output}")
@@ -125,11 +136,17 @@ function zunder_right_prompt_update() {
 
     if (( ${ZUNDER_PROMPT_BOTTOM_RIGHT_MODULE_CACHE[(I)$((i-1))]} )); then
       if [[ -z "${_ZUNDER_CACHE_BOTTOM[$i]}" ]]; then
+        start=$EPOCHREALTIME
         _ZUNDER_CACHE_BOTTOM[$i]=$(eval "$module" 2>/dev/null)
+        end=$EPOCHREALTIME
+        _ZUNDER_TIMINGS_BOTTOM[$i]=$(( (end - start) * 1000 ))
       fi
       output="${_ZUNDER_CACHE_BOTTOM[$i]}"
     else
+      start=$EPOCHREALTIME
       output=$(eval "$module" 2>/dev/null)
+      end=$EPOCHREALTIME
+      _ZUNDER_TIMINGS_BOTTOM[$i]=$(( (end - start) * 1000 ))
     fi
 
     [[ -n "$output" ]] && bottom_segments+=("${output}")
@@ -144,7 +161,6 @@ function zunder_right_prompt_update() {
   [[ -n "$ZUNDER_TOP_RIGHT_PROMPT" ]] && right_len=$ZUNDER_TOP_RIGHT_PROMPT_LEN
 
   # The path is truncated if it doesn't fit.
-  # We leave at least 1 space between git and right modules if both exist.
   local total_right_len=$(( git_len + (right_len > 0 ? right_len + 1 : 0) ))
   typeset -g ZUNDER_TOP_LINE_RIGHT_LEN=$total_right_len
 
@@ -158,6 +174,31 @@ function zunder_right_prompt_update() {
   if (( right_len > 0 )); then
     ZUNDER_TOP_LINE_PAD_LEN=$(( COLUMNS - path_len - git_len - right_len - 1 ))
     (( ZUNDER_TOP_LINE_PAD_LEN < 1 )) && ZUNDER_TOP_LINE_PAD_LEN=1
+  fi
+}
+
+function prompt-timings() {
+  local i
+  print "zunder-prompt module timings (ms):"
+  
+  if (( ${#ZUNDER_PROMPT_TOP_RIGHT_MODULES} > 0 )); then
+    print "\nTop Right Modules:"
+    for i in {1..${#ZUNDER_PROMPT_TOP_RIGHT_MODULES}}; do
+      [[ $i -gt 7 ]] && break
+      printf "  [%d] %-30s %10.2f ms" $((i-1)) "${ZUNDER_PROMPT_TOP_RIGHT_MODULES[$i]}" "${_ZUNDER_TIMINGS_TOP[$i]:-0}"
+      (( ${ZUNDER_PROMPT_TOP_RIGHT_MODULE_CACHE[(I)$((i-1))]} )) && printf " (cached)"
+      print
+    done
+  fi
+
+  if (( ${#ZUNDER_PROMPT_BOTTOM_RIGHT_MODULES} > 0 )); then
+    print "\nBottom Right Modules:"
+    for i in {1..${#ZUNDER_PROMPT_BOTTOM_RIGHT_MODULES}}; do
+      [[ $i -gt 7 ]] && break
+      printf "  [%d] %-30s %10.2f ms" $((i-1)) "${ZUNDER_PROMPT_BOTTOM_RIGHT_MODULES[$i]}" "${_ZUNDER_TIMINGS_BOTTOM[$i]:-0}"
+      (( ${ZUNDER_PROMPT_BOTTOM_RIGHT_MODULE_CACHE[(I)$((i-1))]} )) && printf " (cached)"
+      print
+    done
   fi
 }
 
