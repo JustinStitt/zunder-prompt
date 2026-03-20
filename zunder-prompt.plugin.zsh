@@ -86,7 +86,7 @@ function _zunder_recalculate_layout() {
 
   typeset -g ZUNDER_TOP_LINE_PAD_LEN=0
   if (( right_len > 0 )); then
-    ZUNDER_TOP_LINE_PAD_LEN=$(( COLUMNS - path_len - git_len - right_len ))
+    ZUNDER_TOP_LINE_PAD_LEN=$(( COLUMNS - path_len - git_len - right_len - 1))
     (( ZUNDER_TOP_LINE_PAD_LEN < 1 )) && ZUNDER_TOP_LINE_PAD_LEN=1
   fi
 }
