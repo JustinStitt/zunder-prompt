@@ -31,14 +31,14 @@ uses **gitstatus** (like Powerlevel10k) for optimized git info, ensuring
 ```sh
 zinit light-mode depth"1" for \
   romkatv/gitstatus \
-  warbacon/zunder-prompt
+  justinstitt/zunder-prompt
 ```
 
 ### [Zap](https://github.com/zap-zsh/zap)
 
 ```sh
 plug "romkatv/gitstatus"
-plug "warbacon/zunder-prompt"
+plug "justinstitt/zunder-prompt"
 ```
 
 ### [Zgenom](https://github.com/jandamm/zgenom)
@@ -47,7 +47,7 @@ plug "warbacon/zunder-prompt"
 if ! zgenom saved; then
   # ...
   zgenom load romkatv/gitstatus
-  zgenom load warbacon/zunder-prompt
+  zgenom load justinstitt/zunder-prompt
   # ...
 fi
 ```
@@ -56,7 +56,7 @@ fi
 
 ```sh
 zplug "romkatv/gitstatus", depth:1
-zplug "warbacon/zunder-prompt", on:"romkatv/gitstatus", depth=1
+zplug "justinstitt/zunder-prompt", on:"romkatv/gitstatus", depth=1
 ```
 
 ## Customization 🎨
