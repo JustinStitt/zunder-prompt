@@ -20,6 +20,7 @@ typeset -gA _ZUNDER_ASYNC_BOTTOM_VALS
 
 # Async infrastructure
 typeset -g _ZUNDER_GIT_FD
+typeset -g _ZUNDER_GIT_LOADING=1
 typeset -g _ZUNDER_TOP_ASYNC_FD
 typeset -g _ZUNDER_BOTTOM_ASYNC_FD
 
@@ -95,16 +96,17 @@ function _zunder_gitstatus_callback() {
   emulate -L zsh
   local fd=$1 data
   if read -u $fd data 2>/dev/null; then
+    typeset -g _ZUNDER_GIT_LOADING=0
     if [[ -n "$data" ]]; then
       # format: len|str|timing
       typeset -g GITSTATUS_PROMPT_LEN="${data%%|*}"
       local rest="${data#*|}"
       typeset -g GITSTATUS_PROMPT="${rest%|*}"
       typeset -g _ZUNDER_TIMINGS_GIT="${rest##*|}"
-      
+
       _zunder_recalculate_layout
-      [[ -o zle ]] && zle reset-prompt
     fi
+    [[ -o zle ]] && zle reset-prompt
   fi
   zle -F $fd 2>/dev/null
   exec {fd}<&-
@@ -161,6 +163,8 @@ function zunder_gitstatus_async_start() {
       else
         echo "0||$(( (end - start) * 1000 ))"
       fi
+    else
+      echo "0||0"
     fi
   ); then
     _ZUNDER_GIT_FD=$fd
@@ -171,6 +175,7 @@ function zunder_gitstatus_async_start() {
 function gitstatus_prompt_update() {
   typeset -g GITSTATUS_PROMPT=''
   typeset -g GITSTATUS_PROMPT_LEN=0
+  typeset -g _ZUNDER_GIT_LOADING=1
   zunder_gitstatus_async_start
 }
 
@@ -196,7 +201,7 @@ function zunder_right_prompt_update() {
     if (( ${ZUNDER_PROMPT_TOP_RIGHT_MODULE_CACHE[(I)$((i-1))]} )) && [[ -n "${_ZUNDER_CACHE_TOP[$i]}" ]]; then
       output="${_ZUNDER_CACHE_TOP[$i]}"
     elif (( ${ZUNDER_PROMPT_TOP_RIGHT_MODULE_ASYNC[(I)$((i-1))]} )); then
-      if [[ -n "${_ZUNDER_ASYNC_TOP_VALS[$i]}" ]]; then
+      if (( ${+_ZUNDER_ASYNC_TOP_VALS[$i]} )); then
         output="${_ZUNDER_ASYNC_TOP_VALS[$i]}"
       else
         output=""
@@ -229,7 +234,7 @@ function zunder_right_prompt_update() {
     if (( ${ZUNDER_PROMPT_BOTTOM_RIGHT_MODULE_CACHE[(I)$((i-1))]} )) && [[ -n "${_ZUNDER_CACHE_BOTTOM[$i]}" ]]; then
       output="${_ZUNDER_CACHE_BOTTOM[$i]}"
     elif (( ${ZUNDER_PROMPT_BOTTOM_RIGHT_MODULE_ASYNC[(I)$((i-1))]} )); then
-      if [[ -n "${_ZUNDER_ASYNC_BOTTOM_VALS[$i]}" ]]; then
+      if (( ${+_ZUNDER_ASYNC_BOTTOM_VALS[$i]} )); then
         output="${_ZUNDER_ASYNC_BOTTOM_VALS[$i]}"
       else
         output=""
@@ -313,6 +318,7 @@ PROMPT2="%8F·%f "
 _ZUNDER_PATH_TRUNC_VAL='$(( (COLUMNS - ZUNDER_TOP_LINE_RIGHT_LEN) < 10 ? 10 : (COLUMNS - ZUNDER_TOP_LINE_RIGHT_LEN) ))'
 PROMPT='%B%6F%${(e)_ZUNDER_PATH_TRUNC_VAL}<…<%~%<<%f%b'
 PROMPT+='${GITSTATUS_PROMPT:+ $GITSTATUS_PROMPT}'
+PROMPT+='${${_ZUNDER_GIT_LOADING:#1}:+${${ZUNDER_PROMPT_SHOW_USER_INFO:#0}:+ as %13F%n@%m%f}}'
 PROMPT+='${ZUNDER_TOP_RIGHT_PROMPT:+${(r:ZUNDER_TOP_LINE_PAD_LEN:: :)}$ZUNDER_TOP_RIGHT_PROMPT}'
 PROMPT+=$'\n'
 PROMPT+='%F{%(?.${ZUNDER_PROMPT_CHAR_COLOR}.red)}${ZUNDER_PROMPT_CHAR}%f '

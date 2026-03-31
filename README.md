@@ -69,6 +69,8 @@ symbol and color, and add custom right-aligned segments.
 ZUNDER_PROMPT_CHAR="➜"              # default value: "❯"
 
 ZUNDER_PROMPT_CHAR_COLOR="green"    # default value: "fg"
+
+ZUNDER_PROMPT_SHOW_USER_INFO=1      # show user@host after path (default: off)
 ```
 
 ### Custom Right-Aligned Modules
