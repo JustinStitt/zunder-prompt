@@ -1,7 +1,7 @@
 # Check if gitstatus is available.
 if ! typeset -f gitstatus_query > /dev/null; then
   echo "The gitstatus plugin is not installed and is required" \
-       "to use zunder-prompt."
+       "to use suki-prompt."
   return 0
 fi
 
@@ -9,22 +9,26 @@ fi
 zmodload zsh/datetime
 
 # Internal storage for cache, timings, and async values
-typeset -gA _ZUNDER_CACHE_TOP
-typeset -gA _ZUNDER_CACHE_BOTTOM
-typeset -gA _ZUNDER_TIMINGS_TOP
-typeset -gA _ZUNDER_TIMINGS_BOTTOM
-typeset -g  _ZUNDER_TIMINGS_GIT=0
+typeset -gA _SUKI_CACHE_TOP
+typeset -gA _SUKI_CACHE_BOTTOM
+typeset -gA _SUKI_CACHE_POST_PATH
+typeset -gA _SUKI_TIMINGS_TOP
+typeset -gA _SUKI_TIMINGS_BOTTOM
+typeset -gA _SUKI_TIMINGS_POST_PATH
+typeset -g  _SUKI_TIMINGS_GIT=0
 
-typeset -gA _ZUNDER_ASYNC_TOP_VALS
-typeset -gA _ZUNDER_ASYNC_BOTTOM_VALS
+typeset -gA _SUKI_ASYNC_TOP_VALS
+typeset -gA _SUKI_ASYNC_BOTTOM_VALS
+typeset -gA _SUKI_ASYNC_POST_PATH_VALS
 
 # Async infrastructure
-typeset -g _ZUNDER_GIT_FD
-typeset -g _ZUNDER_GIT_LOADING=1
-typeset -g _ZUNDER_TOP_ASYNC_FD
-typeset -g _ZUNDER_BOTTOM_ASYNC_FD
+typeset -g _SUKI_GIT_FD
+typeset -g _SUKI_GIT_LOADING=1
+typeset -g _SUKI_TOP_ASYNC_FD
+typeset -g _SUKI_BOTTOM_ASYNC_FD
+typeset -g _SUKI_POST_PATH_ASYNC_FD
 
-function _zunder_gitstatus_format() {
+function _suki_gitstatus_format() {
   emulate -L zsh
   [[ $VCS_STATUS_RESULT == 'ok-sync' ]] || return 1
 
@@ -64,20 +68,23 @@ function _zunder_gitstatus_format() {
   (( VCS_STATUS_NUM_UNTRACKED  )) && p+=" ${untracked}?${VCS_STATUS_NUM_UNTRACKED}"
 
   local prompt_str="${p}%f"
-  local prompt_len="${(m)#${${${prompt_str//\%\%/x}//\%(f|<->F)}//\%[Bb]}}"
+  local prompt_len="${(m)#${${${prompt_str//\%\%/x}//\%(f|k|<->[FK])}//\%[BbUuSs]}}"
   echo "${prompt_len}|${prompt_str}"
 }
 
-function _zunder_recalculate_layout() {
+function _suki_recalculate_layout() {
   emulate -L zsh
   local git_len=0
   [[ -n "$GITSTATUS_PROMPT" ]] && git_len=$(( GITSTATUS_PROMPT_LEN + 1 ))
 
-  local right_len=0
-  [[ -n "$ZUNDER_TOP_RIGHT_PROMPT" ]] && right_len=$ZUNDER_TOP_RIGHT_PROMPT_LEN
+  local post_path_len=0
+  [[ -n "$SUKI_POST_PATH_PROMPT" ]] && post_path_len=$(( SUKI_POST_PATH_PROMPT_LEN + 1 ))
 
-  local total_right_len=$(( git_len + (right_len > 0 ? right_len + 1 : 0) ))
-  typeset -g ZUNDER_TOP_LINE_RIGHT_LEN=$total_right_len
+  local right_len=0
+  [[ -n "$SUKI_TOP_RIGHT_PROMPT" ]] && right_len=$SUKI_TOP_RIGHT_PROMPT_LEN
+
+  local total_right_len=$(( git_len + post_path_len + (right_len > 0 ? right_len + 1 : 0) ))
+  typeset -g SUKI_TOP_LINE_RIGHT_LEN=$total_right_len
 
   local path_max_len=$(( COLUMNS - total_right_len ))
   (( path_max_len < 10 )) && path_max_len=10
@@ -85,35 +92,35 @@ function _zunder_recalculate_layout() {
   local expanded_path="${(%):-%${path_max_len}<…<%~%<<}"
   local path_len="${(m)#expanded_path}"
 
-  typeset -g ZUNDER_TOP_LINE_PAD_LEN=0
+  typeset -g SUKI_TOP_LINE_PAD_LEN=0
   if (( right_len > 0 )); then
-    ZUNDER_TOP_LINE_PAD_LEN=$(( COLUMNS - path_len - git_len - right_len - 1))
-    (( ZUNDER_TOP_LINE_PAD_LEN < 1 )) && ZUNDER_TOP_LINE_PAD_LEN=1
+    SUKI_TOP_LINE_PAD_LEN=$(( COLUMNS - path_len - git_len - post_path_len - right_len))
+    (( SUKI_TOP_LINE_PAD_LEN < 1 )) && SUKI_TOP_LINE_PAD_LEN=1
   fi
 }
 
-function _zunder_gitstatus_callback() {
+function _suki_gitstatus_callback() {
   emulate -L zsh
   local fd=$1 data
   if read -u $fd data 2>/dev/null; then
-    typeset -g _ZUNDER_GIT_LOADING=0
+    typeset -g _SUKI_GIT_LOADING=0
     if [[ -n "$data" ]]; then
       # format: len|str|timing
       typeset -g GITSTATUS_PROMPT_LEN="${data%%|*}"
       local rest="${data#*|}"
       typeset -g GITSTATUS_PROMPT="${rest%|*}"
-      typeset -g _ZUNDER_TIMINGS_GIT="${rest##*|}"
+      typeset -g _SUKI_TIMINGS_GIT="${rest##*|}"
 
-      _zunder_recalculate_layout
+      _suki_recalculate_layout
     fi
     [[ -o zle ]] && zle reset-prompt
   fi
   zle -F $fd 2>/dev/null
   exec {fd}<&-
-  [[ "$_ZUNDER_GIT_FD" == "$fd" ]] && _ZUNDER_GIT_FD=
+  [[ "$_SUKI_GIT_FD" == "$fd" ]] && _SUKI_GIT_FD=
 }
 
-function _zunder_module_async_callback() {
+function _suki_module_async_callback() {
   emulate -L zsh
   local fd=$1 side=$2 data
   if read -u $fd data 2>/dev/null; then
@@ -124,40 +131,48 @@ function _zunder_module_async_callback() {
     local timing="${rest#*|}"
     
     if [[ "$side" == "top" ]]; then
-      _ZUNDER_ASYNC_TOP_VALS[$idx]="$val"
-      _ZUNDER_TIMINGS_TOP[$idx]="$timing"
-      if (( ${ZUNDER_PROMPT_TOP_RIGHT_MODULE_CACHE[(I)$((idx-1))]} )); then
-        _ZUNDER_CACHE_TOP[$idx]="$val"
+      _SUKI_ASYNC_TOP_VALS[$idx]="$val"
+      _SUKI_TIMINGS_TOP[$idx]="$timing"
+      if (( ${SUKI_PROMPT_TOP_RIGHT_MODULE_CACHE[(I)$((idx-1))]} )); then
+        _SUKI_CACHE_TOP[$idx]="$val"
+      fi
+    elif [[ "$side" == "post_path" ]]; then
+      _SUKI_ASYNC_POST_PATH_VALS[$idx]="$val"
+      _SUKI_TIMINGS_POST_PATH[$idx]="$timing"
+      if (( ${SUKI_PROMPT_POST_PATH_MODULE_CACHE[(I)$((idx-1))]} )); then
+        _SUKI_CACHE_POST_PATH[$idx]="$val"
       fi
     else
-      _ZUNDER_ASYNC_BOTTOM_VALS[$idx]="$val"
-      _ZUNDER_TIMINGS_BOTTOM[$idx]="$timing"
-      if (( ${ZUNDER_PROMPT_BOTTOM_RIGHT_MODULE_CACHE[(I)$((idx-1))]} )); then
-        _ZUNDER_CACHE_BOTTOM[$idx]="$val"
+      _SUKI_ASYNC_BOTTOM_VALS[$idx]="$val"
+      _SUKI_TIMINGS_BOTTOM[$idx]="$timing"
+      if (( ${SUKI_PROMPT_BOTTOM_RIGHT_MODULE_CACHE[(I)$((idx-1))]} )); then
+        _SUKI_CACHE_BOTTOM[$idx]="$val"
       fi
     fi
     
-    zunder_right_prompt_update
+    suki_right_prompt_update
     [[ -o zle ]] && zle reset-prompt
   fi
   zle -F $fd 2>/dev/null
   exec {fd}<&-
-  [[ "$side" == "top" && "$_ZUNDER_TOP_ASYNC_FD" == "$fd" ]] && _ZUNDER_TOP_ASYNC_FD=
-  [[ "$side" == "bottom" && "$_ZUNDER_BOTTOM_ASYNC_FD" == "$fd" ]] && _ZUNDER_BOTTOM_ASYNC_FD=
+  [[ "$side" == "top" && "$_SUKI_TOP_ASYNC_FD" == "$fd" ]] && _SUKI_TOP_ASYNC_FD=
+  [[ "$side" == "bottom" && "$_SUKI_BOTTOM_ASYNC_FD" == "$fd" ]] && _SUKI_BOTTOM_ASYNC_FD=
+  [[ "$side" == "post_path" && "$_SUKI_POST_PATH_ASYNC_FD" == "$fd" ]] && _SUKI_POST_PATH_ASYNC_FD=
 }
 
-function _zunder_top_module_async_callback() { _zunder_module_async_callback $1 "top" }
-function _zunder_bottom_module_async_callback() { _zunder_module_async_callback $1 "bottom" }
+function _suki_top_module_async_callback() { _suki_module_async_callback $1 "top" }
+function _suki_bottom_module_async_callback() { _suki_module_async_callback $1 "bottom" }
+function _suki_post_path_module_async_callback() { _suki_module_async_callback $1 "post_path" }
 
-function zunder_gitstatus_async_start() {
+function suki_gitstatus_async_start() {
   emulate -L zsh
-  [[ -n "$_ZUNDER_GIT_FD" ]] && { zle -F $_ZUNDER_GIT_FD 2>/dev/null; exec {_ZUNDER_GIT_FD}<&-; _ZUNDER_GIT_FD=; }
+  [[ -n "$_SUKI_GIT_FD" ]] && { zle -F $_SUKI_GIT_FD 2>/dev/null; exec {_SUKI_GIT_FD}<&-; _SUKI_GIT_FD=; }
   local fd
   if exec {fd}< <(
     local start=$EPOCHREALTIME
     if gitstatus_query 'MY'; then
       local end=$EPOCHREALTIME
-      local fmt=$(_zunder_gitstatus_format)
+      local fmt=$(_suki_gitstatus_format)
       if [[ -n "$fmt" ]]; then
         echo "${fmt}|$(( (end - start) * 1000 ))"
       else
@@ -167,42 +182,47 @@ function zunder_gitstatus_async_start() {
       echo "0||0"
     fi
   ); then
-    _ZUNDER_GIT_FD=$fd
-    zle -F $fd _zunder_gitstatus_callback
+    _SUKI_GIT_FD=$fd
+    zle -F $fd _suki_gitstatus_callback
   fi
 }
 
 function gitstatus_prompt_update() {
   typeset -g GITSTATUS_PROMPT=''
   typeset -g GITSTATUS_PROMPT_LEN=0
-  typeset -g _ZUNDER_GIT_LOADING=1
-  zunder_gitstatus_async_start
+  typeset -g _SUKI_GIT_LOADING=1
+  suki_gitstatus_async_start
 }
 
 # Configuration Arrays
-if ! (( ${+ZUNDER_PROMPT_TOP_RIGHT_MODULES} )); then typeset -ga ZUNDER_PROMPT_TOP_RIGHT_MODULES; ZUNDER_PROMPT_TOP_RIGHT_MODULES=(); fi
-if ! (( ${+ZUNDER_PROMPT_TOP_RIGHT_MODULE_CACHE} )); then typeset -ga ZUNDER_PROMPT_TOP_RIGHT_MODULE_CACHE; ZUNDER_PROMPT_TOP_RIGHT_MODULE_CACHE=(); fi
-if ! (( ${+ZUNDER_PROMPT_TOP_RIGHT_MODULE_ASYNC} )); then typeset -ga ZUNDER_PROMPT_TOP_RIGHT_MODULE_ASYNC; ZUNDER_PROMPT_TOP_RIGHT_MODULE_ASYNC=(); fi
+if ! (( ${+SUKI_PROMPT_TOP_RIGHT_MODULES} )); then typeset -ga SUKI_PROMPT_TOP_RIGHT_MODULES; SUKI_PROMPT_TOP_RIGHT_MODULES=(); fi
+if ! (( ${+SUKI_PROMPT_TOP_RIGHT_MODULE_CACHE} )); then typeset -ga SUKI_PROMPT_TOP_RIGHT_MODULE_CACHE; SUKI_PROMPT_TOP_RIGHT_MODULE_CACHE=(); fi
+if ! (( ${+SUKI_PROMPT_TOP_RIGHT_MODULE_ASYNC} )); then typeset -ga SUKI_PROMPT_TOP_RIGHT_MODULE_ASYNC; SUKI_PROMPT_TOP_RIGHT_MODULE_ASYNC=(); fi
 
-if ! (( ${+ZUNDER_PROMPT_BOTTOM_RIGHT_MODULES} )); then typeset -ga ZUNDER_PROMPT_BOTTOM_RIGHT_MODULES; ZUNDER_PROMPT_BOTTOM_RIGHT_MODULES=(); fi
-if ! (( ${+ZUNDER_PROMPT_BOTTOM_RIGHT_MODULE_CACHE} )); then typeset -ga ZUNDER_PROMPT_BOTTOM_RIGHT_MODULE_CACHE; ZUNDER_PROMPT_BOTTOM_RIGHT_MODULE_CACHE=(); fi
-if ! (( ${+ZUNDER_PROMPT_BOTTOM_RIGHT_MODULE_ASYNC} )); then typeset -ga ZUNDER_PROMPT_BOTTOM_RIGHT_MODULE_ASYNC; ZUNDER_PROMPT_BOTTOM_RIGHT_MODULE_ASYNC=(); fi
+if ! (( ${+SUKI_PROMPT_BOTTOM_RIGHT_MODULES} )); then typeset -ga SUKI_PROMPT_BOTTOM_RIGHT_MODULES; SUKI_PROMPT_BOTTOM_RIGHT_MODULES=(); fi
+if ! (( ${+SUKI_PROMPT_BOTTOM_RIGHT_MODULE_CACHE} )); then typeset -ga SUKI_PROMPT_BOTTOM_RIGHT_MODULE_CACHE; SUKI_PROMPT_BOTTOM_RIGHT_MODULE_CACHE=(); fi
+if ! (( ${+SUKI_PROMPT_BOTTOM_RIGHT_MODULE_ASYNC} )); then typeset -ga SUKI_PROMPT_BOTTOM_RIGHT_MODULE_ASYNC; SUKI_PROMPT_BOTTOM_RIGHT_MODULE_ASYNC=(); fi
 
-function zunder_right_prompt_update() {
+if ! (( ${+SUKI_PROMPT_POST_PATH_MODULES} )); then typeset -ga SUKI_PROMPT_POST_PATH_MODULES; SUKI_PROMPT_POST_PATH_MODULES=(); fi
+if ! (( ${+SUKI_PROMPT_POST_PATH_MODULE_CACHE} )); then typeset -ga SUKI_PROMPT_POST_PATH_MODULE_CACHE; SUKI_PROMPT_POST_PATH_MODULE_CACHE=(); fi
+if ! (( ${+SUKI_PROMPT_POST_PATH_MODULE_ASYNC} )); then typeset -ga SUKI_PROMPT_POST_PATH_MODULE_ASYNC; SUKI_PROMPT_POST_PATH_MODULE_ASYNC=(); fi
+
+function suki_right_prompt_update() {
   emulate -L zsh
+  setopt extended_glob
   local module output i start end fd
 
   # Top right modules
   local -a top_segments
   i=0
-  for module in "${ZUNDER_PROMPT_TOP_RIGHT_MODULES[@]}"; do
+  for module in "${SUKI_PROMPT_TOP_RIGHT_MODULES[@]}"; do
     (( i++ )); [[ $i -gt 7 ]] && break
 
-    if (( ${ZUNDER_PROMPT_TOP_RIGHT_MODULE_CACHE[(I)$((i-1))]} )) && [[ -n "${_ZUNDER_CACHE_TOP[$i]}" ]]; then
-      output="${_ZUNDER_CACHE_TOP[$i]}"
-    elif (( ${ZUNDER_PROMPT_TOP_RIGHT_MODULE_ASYNC[(I)$((i-1))]} )); then
-      if (( ${+_ZUNDER_ASYNC_TOP_VALS[$i]} )); then
-        output="${_ZUNDER_ASYNC_TOP_VALS[$i]}"
+    if (( ${SUKI_PROMPT_TOP_RIGHT_MODULE_CACHE[(I)$((i-1))]} )) && [[ -n "${_SUKI_CACHE_TOP[$i]}" ]]; then
+      output="${_SUKI_CACHE_TOP[$i]}"
+    elif (( ${SUKI_PROMPT_TOP_RIGHT_MODULE_ASYNC[(I)$((i-1))]} )); then
+      if (( ${+_SUKI_ASYNC_TOP_VALS[$i]} )); then
+        output="${_SUKI_ASYNC_TOP_VALS[$i]}"
       else
         output=""
         exec {fd}< <(
@@ -211,31 +231,31 @@ function zunder_right_prompt_update() {
           local e=$EPOCHREALTIME
           echo "$i|$v|$(( (e-s)*1000 ))"
         )
-        zle -F $fd _zunder_top_module_async_callback
+        zle -F $fd _suki_top_module_async_callback
       fi
     else
       start=$EPOCHREALTIME
       output=$(eval "$module" 2>/dev/null)
       end=$EPOCHREALTIME
-      _ZUNDER_TIMINGS_TOP[$i]=$(( (end - start) * 1000 ))
-      (( ${ZUNDER_PROMPT_TOP_RIGHT_MODULE_CACHE[(I)$((i-1))]} )) && _ZUNDER_CACHE_TOP[$i]="$output"
+      _SUKI_TIMINGS_TOP[$i]=$(( (end - start) * 1000 ))
+      (( ${SUKI_PROMPT_TOP_RIGHT_MODULE_CACHE[(I)$((i-1))]} )) && _SUKI_CACHE_TOP[$i]="$output"
     fi
     [[ -n "$output" ]] && top_segments+=("${output}")
   done
-  typeset -g ZUNDER_TOP_RIGHT_PROMPT="${(j: :)top_segments}"
-  typeset -gi ZUNDER_TOP_RIGHT_PROMPT_LEN="${(m)#${${${ZUNDER_TOP_RIGHT_PROMPT//\%\%/x}//\%(f|<->F)}//\%[Bb]}}"
+  typeset -g SUKI_TOP_RIGHT_PROMPT="${(j: :)top_segments}"
+  typeset -gi SUKI_TOP_RIGHT_PROMPT_LEN="${(m)#${${${SUKI_TOP_RIGHT_PROMPT//\%\%/x}//\%(f|k|<->[FK])}//\%[BbUuSs]}}"
 
   # Bottom right modules (RPROMPT)
   local -a bottom_segments
   i=0
-  for module in "${ZUNDER_PROMPT_BOTTOM_RIGHT_MODULES[@]}"; do
+  for module in "${SUKI_PROMPT_BOTTOM_RIGHT_MODULES[@]}"; do
     (( i++ )); [[ $i -gt 7 ]] && break
 
-    if (( ${ZUNDER_PROMPT_BOTTOM_RIGHT_MODULE_CACHE[(I)$((i-1))]} )) && [[ -n "${_ZUNDER_CACHE_BOTTOM[$i]}" ]]; then
-      output="${_ZUNDER_CACHE_BOTTOM[$i]}"
-    elif (( ${ZUNDER_PROMPT_BOTTOM_RIGHT_MODULE_ASYNC[(I)$((i-1))]} )); then
-      if (( ${+_ZUNDER_ASYNC_BOTTOM_VALS[$i]} )); then
-        output="${_ZUNDER_ASYNC_BOTTOM_VALS[$i]}"
+    if (( ${SUKI_PROMPT_BOTTOM_RIGHT_MODULE_CACHE[(I)$((i-1))]} )) && [[ -n "${_SUKI_CACHE_BOTTOM[$i]}" ]]; then
+      output="${_SUKI_CACHE_BOTTOM[$i]}"
+    elif (( ${SUKI_PROMPT_BOTTOM_RIGHT_MODULE_ASYNC[(I)$((i-1))]} )); then
+      if (( ${+_SUKI_ASYNC_BOTTOM_VALS[$i]} )); then
+        output="${_SUKI_ASYNC_BOTTOM_VALS[$i]}"
       else
         output=""
         exec {fd}< <(
@@ -244,46 +264,90 @@ function zunder_right_prompt_update() {
           local e=$EPOCHREALTIME
           echo "$i|$v|$(( (e-s)*1000 ))"
         )
-        zle -F $fd _zunder_bottom_module_async_callback
+        zle -F $fd _suki_bottom_module_async_callback
       fi
     else
       start=$EPOCHREALTIME
       output=$(eval "$module" 2>/dev/null)
       end=$EPOCHREALTIME
-      _ZUNDER_TIMINGS_BOTTOM[$i]=$(( (end - start) * 1000 ))
-      (( ${ZUNDER_PROMPT_BOTTOM_RIGHT_MODULE_CACHE[(I)$((i-1))]} )) && _ZUNDER_CACHE_BOTTOM[$i]="$output"
+      _SUKI_TIMINGS_BOTTOM[$i]=$(( (end - start) * 1000 ))
+      (( ${SUKI_PROMPT_BOTTOM_RIGHT_MODULE_CACHE[(I)$((i-1))]} )) && _SUKI_CACHE_BOTTOM[$i]="$output"
     fi
     [[ -n "$output" ]] && bottom_segments+=("${output}")
   done
   typeset -g RPROMPT="${(j: :)bottom_segments}"
 
-  _zunder_recalculate_layout
+  # Post-path modules (appear after git info on top line)
+  local -a post_path_segments
+  i=0
+  for module in "${SUKI_PROMPT_POST_PATH_MODULES[@]}"; do
+    (( i++ )); [[ $i -gt 7 ]] && break
+
+    if (( ${SUKI_PROMPT_POST_PATH_MODULE_CACHE[(I)$((i-1))]} )) && [[ -n "${_SUKI_CACHE_POST_PATH[$i]}" ]]; then
+      output="${_SUKI_CACHE_POST_PATH[$i]}"
+    elif (( ${SUKI_PROMPT_POST_PATH_MODULE_ASYNC[(I)$((i-1))]} )); then
+      if (( ${+_SUKI_ASYNC_POST_PATH_VALS[$i]} )); then
+        output="${_SUKI_ASYNC_POST_PATH_VALS[$i]}"
+      else
+        output=""
+        exec {fd}< <(
+          local s=$EPOCHREALTIME
+          local v=$(eval "$module" 2>/dev/null)
+          local e=$EPOCHREALTIME
+          echo "$i|$v|$(( (e-s)*1000 ))"
+        )
+        zle -F $fd _suki_post_path_module_async_callback
+      fi
+    else
+      start=$EPOCHREALTIME
+      output=$(eval "$module" 2>/dev/null)
+      end=$EPOCHREALTIME
+      _SUKI_TIMINGS_POST_PATH[$i]=$(( (end - start) * 1000 ))
+      (( ${SUKI_PROMPT_POST_PATH_MODULE_CACHE[(I)$((i-1))]} )) && _SUKI_CACHE_POST_PATH[$i]="$output"
+    fi
+    [[ -n "$output" ]] && post_path_segments+=("${output}")
+  done
+  typeset -g SUKI_POST_PATH_PROMPT="${(j: :)post_path_segments}"
+  typeset -gi SUKI_POST_PATH_PROMPT_LEN="${(m)#${${${SUKI_POST_PATH_PROMPT//\%\%/x}//\%(f|k|<->[FK])}//\%[BbUuSs]}}"
+
+  _suki_recalculate_layout
 }
 
 function prompt-timings() {
   local i
-  print "zunder-prompt module timings (ms):"
+  print "suki-prompt module timings (ms):"
   printf "\nCore Components:\n"
-  printf "  %-33s %10.2f ms (async)\n" "gitstatus_query" "${_ZUNDER_TIMINGS_GIT:-0}"
+  printf "  %-33s %10.2f ms (async)\n" "gitstatus_query" "${_SUKI_TIMINGS_GIT:-0}"
 
-  if (( ${#ZUNDER_PROMPT_TOP_RIGHT_MODULES} > 0 )); then
+  if (( ${#SUKI_PROMPT_TOP_RIGHT_MODULES} > 0 )); then
     print "\nTop Right Modules:"
-    for i in {1..${#ZUNDER_PROMPT_TOP_RIGHT_MODULES}}; do
+    for i in {1..${#SUKI_PROMPT_TOP_RIGHT_MODULES}}; do
       [[ $i -gt 7 ]] && break
-      printf "  [%d] %-30s %10.2f ms" $((i-1)) "${ZUNDER_PROMPT_TOP_RIGHT_MODULES[$i]}" "${_ZUNDER_TIMINGS_TOP[$i]:-0}"
-      (( ${ZUNDER_PROMPT_TOP_RIGHT_MODULE_CACHE[(I)$((i-1))]} )) && printf " (cached)"
-      (( ${ZUNDER_PROMPT_TOP_RIGHT_MODULE_ASYNC[(I)$((i-1))]} )) && printf " (async)"
+      printf "  [%d] %-30s %10.2f ms" $((i-1)) "${SUKI_PROMPT_TOP_RIGHT_MODULES[$i]}" "${_SUKI_TIMINGS_TOP[$i]:-0}"
+      (( ${SUKI_PROMPT_TOP_RIGHT_MODULE_CACHE[(I)$((i-1))]} )) && printf " (cached)"
+      (( ${SUKI_PROMPT_TOP_RIGHT_MODULE_ASYNC[(I)$((i-1))]} )) && printf " (async)"
       print
     done
   fi
 
-  if (( ${#ZUNDER_PROMPT_BOTTOM_RIGHT_MODULES} > 0 )); then
+  if (( ${#SUKI_PROMPT_BOTTOM_RIGHT_MODULES} > 0 )); then
     print "\nBottom Right Modules:"
-    for i in {1..${#ZUNDER_PROMPT_BOTTOM_RIGHT_MODULES}}; do
+    for i in {1..${#SUKI_PROMPT_BOTTOM_RIGHT_MODULES}}; do
       [[ $i -gt 7 ]] && break
-      printf "  [%d] %-30s %10.2f ms" $((i-1)) "${ZUNDER_PROMPT_BOTTOM_RIGHT_MODULES[$i]}" "${_ZUNDER_TIMINGS_BOTTOM[$i]:-0}"
-      (( ${ZUNDER_PROMPT_BOTTOM_RIGHT_MODULE_CACHE[(I)$((i-1))]} )) && printf " (cached)"
-      (( ${ZUNDER_PROMPT_BOTTOM_RIGHT_MODULE_ASYNC[(I)$((i-1))]} )) && printf " (async)"
+      printf "  [%d] %-30s %10.2f ms" $((i-1)) "${SUKI_PROMPT_BOTTOM_RIGHT_MODULES[$i]}" "${_SUKI_TIMINGS_BOTTOM[$i]:-0}"
+      (( ${SUKI_PROMPT_BOTTOM_RIGHT_MODULE_CACHE[(I)$((i-1))]} )) && printf " (cached)"
+      (( ${SUKI_PROMPT_BOTTOM_RIGHT_MODULE_ASYNC[(I)$((i-1))]} )) && printf " (async)"
+      print
+    done
+  fi
+
+  if (( ${#SUKI_PROMPT_POST_PATH_MODULES} > 0 )); then
+    print "\nPost-Path Modules:"
+    for i in {1..${#SUKI_PROMPT_POST_PATH_MODULES}}; do
+      [[ $i -gt 7 ]] && break
+      printf "  [%d] %-30s %10.2f ms" $((i-1)) "${SUKI_PROMPT_POST_PATH_MODULES[$i]}" "${_SUKI_TIMINGS_POST_PATH[$i]:-0}"
+      (( ${SUKI_PROMPT_POST_PATH_MODULE_CACHE[(I)$((i-1))]} )) && printf " (cached)"
+      (( ${SUKI_PROMPT_POST_PATH_MODULE_ASYNC[(I)$((i-1))]} )) && printf " (async)"
       print
     done
   fi
@@ -295,30 +359,33 @@ function check_first_prompt() {
   if [[ $FIRST_PROMPT == false ]]; then printf "\n"; else FIRST_PROMPT=false; fi
 }
 
-function _zunder_clear_async_vals() {
+function _suki_clear_async_vals() {
   local i
-  for i in "${(k)_ZUNDER_ASYNC_TOP_VALS[@]}"; do
-    if ! (( ${ZUNDER_PROMPT_TOP_RIGHT_MODULE_CACHE[(I)$((i-1))]} )); then unset "_ZUNDER_ASYNC_TOP_VALS[$i]"; fi
+  for i in "${(k)_SUKI_ASYNC_TOP_VALS[@]}"; do
+    if ! (( ${SUKI_PROMPT_TOP_RIGHT_MODULE_CACHE[(I)$((i-1))]} )); then unset "_SUKI_ASYNC_TOP_VALS[$i]"; fi
   done
-  for i in "${(k)_ZUNDER_ASYNC_BOTTOM_VALS[@]}"; do
-    if ! (( ${ZUNDER_PROMPT_BOTTOM_RIGHT_MODULE_CACHE[(I)$((i-1))]} )); then unset "_ZUNDER_ASYNC_BOTTOM_VALS[$i]"; fi
+  for i in "${(k)_SUKI_ASYNC_BOTTOM_VALS[@]}"; do
+    if ! (( ${SUKI_PROMPT_BOTTOM_RIGHT_MODULE_CACHE[(I)$((i-1))]} )); then unset "_SUKI_ASYNC_BOTTOM_VALS[$i]"; fi
+  done
+  for i in "${(k)_SUKI_ASYNC_POST_PATH_VALS[@]}"; do
+    if ! (( ${SUKI_PROMPT_POST_PATH_MODULE_CACHE[(I)$((i-1))]} )); then unset "_SUKI_ASYNC_POST_PATH_VALS[$i]"; fi
   done
 }
 
 autoload -Uz add-zsh-hook
 add-zsh-hook precmd gitstatus_prompt_update
-add-zsh-hook precmd _zunder_clear_async_vals
-add-zsh-hook precmd zunder_right_prompt_update
+add-zsh-hook precmd _suki_clear_async_vals
+add-zsh-hook precmd suki_right_prompt_update
 add-zsh-hook precmd check_first_prompt
 
 setopt no_prompt_bang prompt_percent prompt_subst
-[[ -z "$ZUNDER_PROMPT_CHAR" ]] && { ZUNDER_PROMPT_CHAR='%B❯%b'; [[ "$TERM" == "linux" ]] && ZUNDER_PROMPT_CHAR='>'; }
-ZUNDER_PROMPT_CHAR_COLOR="fg"
+[[ -z "$SUKI_PROMPT_CHAR" ]] && { SUKI_PROMPT_CHAR='%B❯%b'; [[ "$TERM" == "linux" ]] && SUKI_PROMPT_CHAR='>'; }
+SUKI_PROMPT_CHAR_COLOR="fg"
 PROMPT2="%8F·%f "
-_ZUNDER_PATH_TRUNC_VAL='$(( (COLUMNS - ZUNDER_TOP_LINE_RIGHT_LEN) < 10 ? 10 : (COLUMNS - ZUNDER_TOP_LINE_RIGHT_LEN) ))'
-PROMPT='%B%6F%${(e)_ZUNDER_PATH_TRUNC_VAL}<…<%~%<<%f%b'
+_SUKI_PATH_TRUNC_VAL='$(( (COLUMNS - SUKI_TOP_LINE_RIGHT_LEN) < 10 ? 10 : (COLUMNS - SUKI_TOP_LINE_RIGHT_LEN) ))'
+PROMPT='%B%6F%${(e)_SUKI_PATH_TRUNC_VAL}<…<%~%<<%f%b'
 PROMPT+='${GITSTATUS_PROMPT:+ $GITSTATUS_PROMPT}'
-PROMPT+='${${_ZUNDER_GIT_LOADING:#1}:+${${ZUNDER_PROMPT_SHOW_USER_INFO:#0}:+ as %13F%n@%m%f}}'
-PROMPT+='${ZUNDER_TOP_RIGHT_PROMPT:+${(r:ZUNDER_TOP_LINE_PAD_LEN:: :)}$ZUNDER_TOP_RIGHT_PROMPT}'
+PROMPT+='${SUKI_POST_PATH_PROMPT:+ $SUKI_POST_PATH_PROMPT}'
+PROMPT+='${SUKI_TOP_RIGHT_PROMPT:+${(r:SUKI_TOP_LINE_PAD_LEN:: :)}$SUKI_TOP_RIGHT_PROMPT}'
 PROMPT+=$'\n'
-PROMPT+='%F{%(?.${ZUNDER_PROMPT_CHAR_COLOR}.red)}${ZUNDER_PROMPT_CHAR}%f '
+PROMPT+='%F{%(?.${SUKI_PROMPT_CHAR_COLOR}.red)}${SUKI_PROMPT_CHAR}%f '

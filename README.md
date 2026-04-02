@@ -1,4 +1,4 @@
-# ⚡ zunder-prompt
+# ⚡ suki-prompt
 
 Simple and fast zsh prompt based on [gitstatus](https://github.com/romkatv/gitstatus).
 
@@ -20,7 +20,7 @@ My goal was to create a prompt with only the **essential functionality**:
 detecting command failures and displaying basic git repository info. I avoided
 advanced customization to keep the code simple yet aesthetically pleasing.
 
-**Zunder-prompt** combines Starship's style and Powerlevel10k's efficiency. It
+**Suki-prompt** combines Starship's style and Powerlevel10k's efficiency. It
 uses **gitstatus** (like Powerlevel10k) for optimized git info, ensuring
 **instant responsiveness** with no lag.
 
@@ -31,14 +31,14 @@ uses **gitstatus** (like Powerlevel10k) for optimized git info, ensuring
 ```sh
 zinit light-mode depth"1" for \
   romkatv/gitstatus \
-  justinstitt/zunder-prompt
+  justinstitt/suki-prompt
 ```
 
 ### [Zap](https://github.com/zap-zsh/zap)
 
 ```sh
 plug "romkatv/gitstatus"
-plug "justinstitt/zunder-prompt"
+plug "justinstitt/suki-prompt"
 ```
 
 ### [Zgenom](https://github.com/jandamm/zgenom)
@@ -47,7 +47,7 @@ plug "justinstitt/zunder-prompt"
 if ! zgenom saved; then
   # ...
   zgenom load romkatv/gitstatus
-  zgenom load justinstitt/zunder-prompt
+  zgenom load justinstitt/suki-prompt
   # ...
 fi
 ```
@@ -56,52 +56,56 @@ fi
 
 ```sh
 zplug "romkatv/gitstatus", depth:1
-zplug "justinstitt/zunder-prompt", on:"romkatv/gitstatus", depth=1
+zplug "justinstitt/suki-prompt", on:"romkatv/gitstatus", depth=1
 ```
 
 ## Customization 🎨
 
-As zunder-prompt is built with simplicity and speed in mind, there isn't too
+As suki-prompt is built with simplicity and speed in mind, there isn't too
 much customization available. However, you can change the prompt's character
 symbol and color, and add custom right-aligned segments.
 
 ```sh
-ZUNDER_PROMPT_CHAR="➜"              # default value: "❯"
+SUKI_PROMPT_CHAR="➜"              # default value: "❯"
 
-ZUNDER_PROMPT_CHAR_COLOR="green"    # default value: "fg"
-
-ZUNDER_PROMPT_SHOW_USER_INFO=1      # show user@host after path (default: off)
+SUKI_PROMPT_CHAR_COLOR="green"    # default value: "fg"
 ```
 
 ### Custom Right-Aligned Modules
 
 You can add up to 7 custom modules to the right side of both prompt lines.
 
-- `ZUNDER_PROMPT_TOP_RIGHT_MODULES`: Aligns on the same line as the filepath and git status.
-- `ZUNDER_PROMPT_BOTTOM_RIGHT_MODULES`: Aligns on the same line as the prompt character (standard `RPROMPT`).
+- `SUKI_PROMPT_TOP_RIGHT_MODULES`: Aligns on the same line as the filepath and git status (right-aligned).
+- `SUKI_PROMPT_BOTTOM_RIGHT_MODULES`: Aligns on the same line as the prompt character (standard `RPROMPT`).
+- `SUKI_PROMPT_POST_PATH_MODULES`: Appears on the top line after the path and git info, before the right-aligned top-right modules.
 
 #### Caching & Asynchronicity
 
 If a module's output is static or expensive to calculate, you can optimize it using 0-based indexing:
 
 **Caching** (calculate once per session):
-- `ZUNDER_PROMPT_TOP_RIGHT_MODULE_CACHE=(idx ...)`
-- `ZUNDER_PROMPT_BOTTOM_RIGHT_MODULE_CACHE=(idx ...)`
+- `SUKI_PROMPT_TOP_RIGHT_MODULE_CACHE=(idx ...)`
+- `SUKI_PROMPT_BOTTOM_RIGHT_MODULE_CACHE=(idx ...)`
+- `SUKI_PROMPT_POST_PATH_MODULE_CACHE=(idx ...)`
 
 **Asynchronicity** (calculate in background to prevent prompt lag):
-- `ZUNDER_PROMPT_TOP_RIGHT_MODULE_ASYNC=(idx ...)`
-- `ZUNDER_PROMPT_BOTTOM_RIGHT_MODULE_ASYNC=(idx ...)`
+- `SUKI_PROMPT_TOP_RIGHT_MODULE_ASYNC=(idx ...)`
+- `SUKI_PROMPT_BOTTOM_RIGHT_MODULE_ASYNC=(idx ...)`
+- `SUKI_PROMPT_POST_PATH_MODULE_ASYNC=(idx ...)`
 
 #### Example Configuration
 
 ```zsh
 # Top line: Date (dynamic), Python version (cached)
-ZUNDER_PROMPT_TOP_RIGHT_MODULES=('date +%H:%M:%S' 'python --version')
-ZUNDER_PROMPT_TOP_RIGHT_MODULE_CACHE=(1)
+SUKI_PROMPT_TOP_RIGHT_MODULES=('date +%H:%M:%S' 'python --version')
+SUKI_PROMPT_TOP_RIGHT_MODULE_CACHE=(1)
 
 # Bottom line: Expensive script (async)
-ZUNDER_PROMPT_BOTTOM_RIGHT_MODULES=('~/scripts/my-slow-script.sh')
-ZUNDER_PROMPT_BOTTOM_RIGHT_MODULE_ASYNC=(0)
+SUKI_PROMPT_BOTTOM_RIGHT_MODULES=('~/scripts/my-slow-script.sh')
+SUKI_PROMPT_BOTTOM_RIGHT_MODULE_ASYNC=(0)
+
+# Post-path: Show user@host after path and git info
+SUKI_PROMPT_POST_PATH_MODULES=('echo "as $(whoami)@$(hostname)"')
 ```
 
 #### Performance Tracking
@@ -109,7 +113,7 @@ ZUNDER_PROMPT_BOTTOM_RIGHT_MODULE_ASYNC=(0)
 You can use the `prompt-timings` command to see a breakdown of how long each module takes to execute in milliseconds. This is useful for identifying slow commands that should be cached.
 
 ```text
-zunder-prompt module timings (ms):
+suki-prompt module timings (ms):
 
 Top Right Modules:
   [0] date +%H:%M:%S                     1.23 ms
