@@ -378,6 +378,7 @@ add-zsh-hook precmd _suki_clear_async_vals
 add-zsh-hook precmd suki_right_prompt_update
 add-zsh-hook precmd check_first_prompt
 
+ZLE_RPROMPT_INDENT=0
 setopt no_prompt_bang prompt_percent prompt_subst
 [[ -z "$SUKI_PROMPT_CHAR" ]] && { SUKI_PROMPT_CHAR='%B✦%b'; [[ "$TERM" == "linux" ]] && SUKI_PROMPT_CHAR='>'; }
 SUKI_PROMPT_CHAR_COLOR="fg"
