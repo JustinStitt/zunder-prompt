@@ -1,4 +1,4 @@
-# ⚡ suki-prompt
+# 🐕 suki-prompt
 
 Simple, fast and minimially customizable zsh prompt based on
 [gitstatus](https://github.com/romkatv/gitstatus).
