@@ -3,7 +3,7 @@
 Simple, fast and minimially customizable zsh prompt based on
 [gitstatus](https://github.com/romkatv/gitstatus).
 
-![preview](./assets/preview.svg)
+![preview](./assets/carbon.png)
 
 > [!IMPORTANT]
 > gitstatus officially went on life support on June 6, 2024, although it is
