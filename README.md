@@ -1,6 +1,7 @@
 # ⚡ suki-prompt
 
-Simple and fast zsh prompt based on [gitstatus](https://github.com/romkatv/gitstatus).
+Simple, fast and minimially customizable zsh prompt based on
+[gitstatus](https://github.com/romkatv/gitstatus).
 
 ![preview](./assets/preview.svg)
 
@@ -14,11 +15,7 @@ Simple and fast zsh prompt based on [gitstatus](https://github.com/romkatv/gitst
 I oscillated between **Starship** and **Powerlevel10k** for my zsh prompt.
 **Starship** is customizable and visually appealing by default but has
 unnecessary features, making it slower. **Powerlevel10k** is extremely fast but
-has a complex configuration.
-
-My goal was to create a prompt with only the **essential functionality**:
-detecting command failures and displaying basic git repository info. I avoided
-advanced customization to keep the code simple yet aesthetically pleasing.
+has a complex configuration as has recently been abandoned.
 
 **Suki-prompt** combines Starship's style and Powerlevel10k's efficiency. It
 uses **gitstatus** (like Powerlevel10k) for optimized git info, ensuring
@@ -26,37 +23,11 @@ uses **gitstatus** (like Powerlevel10k) for optimized git info, ensuring
 
 ## Installation ⚙️
 
-### [Zinit](https://github.com/zdharma-continuum/zinit)
-
-```sh
-zinit light-mode depth"1" for \
-  romkatv/gitstatus \
-  justinstitt/suki-prompt
-```
-
 ### [Zap](https://github.com/zap-zsh/zap)
 
 ```sh
 plug "romkatv/gitstatus"
 plug "justinstitt/suki-prompt"
-```
-
-### [Zgenom](https://github.com/jandamm/zgenom)
-
-```sh
-if ! zgenom saved; then
-  # ...
-  zgenom load romkatv/gitstatus
-  zgenom load justinstitt/suki-prompt
-  # ...
-fi
-```
-
-### [Zplug](https://github.com/zplug/zplug)
-
-```sh
-zplug "romkatv/gitstatus", depth:1
-zplug "justinstitt/suki-prompt", on:"romkatv/gitstatus", depth=1
 ```
 
 ## Customization 🎨
