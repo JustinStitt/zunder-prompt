@@ -379,7 +379,7 @@ add-zsh-hook precmd suki_right_prompt_update
 add-zsh-hook precmd check_first_prompt
 
 setopt no_prompt_bang prompt_percent prompt_subst
-[[ -z "$SUKI_PROMPT_CHAR" ]] && { SUKI_PROMPT_CHAR='%B❯%b'; [[ "$TERM" == "linux" ]] && SUKI_PROMPT_CHAR='>'; }
+[[ -z "$SUKI_PROMPT_CHAR" ]] && { SUKI_PROMPT_CHAR='%B✦%b'; [[ "$TERM" == "linux" ]] && SUKI_PROMPT_CHAR='>'; }
 SUKI_PROMPT_CHAR_COLOR="fg"
 PROMPT2="%8F·%f "
 _SUKI_PATH_TRUNC_VAL='$(( (COLUMNS - SUKI_TOP_LINE_RIGHT_LEN) < 10 ? 10 : (COLUMNS - SUKI_TOP_LINE_RIGHT_LEN) ))'

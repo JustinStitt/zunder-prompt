@@ -37,9 +37,11 @@ much customization available. However, you can change the prompt's character
 symbol and color, and add custom right-aligned segments.
 
 ```sh
-SUKI_PROMPT_CHAR="➜"              # default value: "❯"
+SUKI_PROMPT_CHAR="➜"              # default value: "✦"
 
 SUKI_PROMPT_CHAR_COLOR="green"    # default value: "fg"
+# Accepts: named colors (black, red, green, yellow, blue, magenta, cyan, white)
+#          or 256-color codes (0-255). On command failure, the char turns red.
 ```
 
 ### Custom Right-Aligned Modules
